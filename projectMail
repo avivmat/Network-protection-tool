@@ -1,0 +1,91 @@
+import smtplib
+import hashlib
+from email.mime.application import MIMEApplication
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.utils import COMMASPACE
+from os.path import basename
+
+
+def main():
+    # email properties
+    print('Please Insert Your Email Details:')
+    sender_mail = input('Email Address: ')
+    sender_pass = input('password: ')
+    mail_recipient =    input('Mail recipient: ')
+    make_check_files()
+
+    # message info
+    message_subject = input('Subject: ')
+    message_body = input('Email Content: ')
+    file_name = input('Attachment: ') #Enter file path
+    # check for malicious content
+    need_to_block = handle_message(file_name)
+
+    send(sender_mail, sender_pass, mail_recipient, message_subject, message_body, file_name, need_to_block)
+
+    # the end..
+
+
+def make_check_files():
+    # make virus file
+    virus_file = open("virusFile.txt", "w+")
+    virus_file.write("58354f2150254041505b345c505a58353428505e2937434329377d2445494341522d5354414e444152442d414e544956495255532d544553542d46494c452124482b482a")
+    virus_file.close()
+
+    # make normal file
+    normal_file = open("normalFile.txt", "w+")
+    normal_file.write("Hello Doron!)")
+    normal_file.close()
+
+
+def handle_message(file_name):
+    hash_sha256 = hashlib.sha256()
+    with open(file_name, "rb") as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            hash_sha256.update(chunk)
+    return hash_sha256.hexdigest() == "f19e45b631e4a80a8852c714d26bec600ef61aad4d7acba55f86d24077cf8c51"
+
+
+# email send request
+def send(sender_mail, sender_pass, mail_recipient, message_subject, message_body, file_name, need_to_block):
+    try:
+        if type(mail_recipient) != list:
+            mail_recipient = [mail_recipient]
+        message = MIMEMultipart()
+        message['From'] = sender_mail
+        message['To'] = COMMASPACE.join(mail_recipient)
+        message['Subject'] = message_subject
+        message["Bcc"] = COMMASPACE.join(mail_recipient)  # Recommended for mass emails
+
+        if not need_to_block:
+            # normal mail
+            message.attach(MIMEText(message_body))
+            # attach file
+            with open(file_name, "rb") as input_file:
+                msg = MIMEApplication(input_file.read(), Name=basename(file_name))
+            msg['Content-Disposition'] = 'Attachment; Filename="%s"' % basename(file_name)
+            message.attach(msg)
+
+        else: # virus mail - need to block the message
+            message.attach(MIMEText('This message has been blocked due to a potential malicious content'))
+
+        # send message
+        server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
+        server.ehlo()
+        server.login(sender_mail, sender_pass)
+        server.sendmail(sender_mail, mail_recipient, message.as_string())
+        server.close()
+        
+        if not need_to_block:
+            print("Message was Sent Successfully :)")
+        else:
+            print("The Message has been BLOCKED")
+
+    except Exception as e:
+        print(e)
+        print('Something went wrong..')
+
+
+if __name__ == "__main__":
+    main()
